@@ -1,0 +1,62 @@
+#  using kafka image from docker hub, not our own image that we create using a Dockerfile
+#  from site hub.docker.com, searched 'kafka docker image'
+version: '3.8'
+
+services:
+  kafka:
+    image: confluentinc/cp-kafka:7.8.3 
+    container_name: kafka
+    ports: 
+      - "9092:9092"
+
+    environment:
+      KAFKA_KRAFT_MODE: 'true'
+      CLUSTER_ID: '1L6g7nGhU-eAKfL--X25wo'
+      KAFKA_NODE_ID: 1
+
+      KAFKA_PROCESS_ROLES: broker, controller
+      # port 9092 is Data Port, for producers and consumers to send and read streaming data messages
+      # port 9093 is control port, private, backchannel for brokers to vote on cluster coordination decisions
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      # replication factor determines how many copies of metadeta are stored (which consumers have read
+      # which events from which topics), 1 means no backup of metadata (just 1 copy), in production, make higher
+      # to replicate data and store in multiple locations, default is 3
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+      # PLAINTEXT means data is sent unencrypted over network to and from Kafka and consumers/producers
+      # typically use SSL
+
+      # Kafka telling docker container which ports to setup to listen from outside traffic at
+      # Docker will open ports at 9092 and listen to traffic from anyone (0.0.0.0), kind of like how 
+      # on local computer, localhost:3000 will open port 3000, but only listen to own computer (localhost)
+      # maps to own computer IP address
+
+      # KAFKA port listens to POST from publisher and GETS from subscribers
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      # tells producers/consumers where to send request, which is on my computer at port 9092, which 
+      # will really map requests to the docker container port 9092, also tells client what security protocol
+      # to use when sending data (PLAINTEXT, aka send unencrypted data)
+
+      # tells producers/consumers to connect to the channel PLAINTEXT using localhost:9092 actually (not default
+      # defined in KAFKA_LISTENERS), but controller lives within kafka, inside docker, so use default
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+
+      # tells kafka where to write all kafka data on computer's disk in docker container
+      KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
+
+    # volume (persists data by mapping it to my local computer)
+    # docker image from docker hub has code to link data from KAFKA_LOG_DIRS path to volume path
+    # maps volume name defined outside to docker container path for volume
+    volumes:
+      - kafka_kraft:/var/lib/kafka/data
+
+      # for persistent data, we must create a docker volume, which maps to local computer
+
+# Named volume, meaning Docker manages the folder within my local computer where it is saved,
+# but it is in a hidden, secure folder, can not see data
+
+# or, can use a Bind Mount, which allows me choose which folder to save data, also I can view it
+# for Bind Mount, no outisde volume, just map inside container ex. /Users/mihir:/var/lib/kafka/data
+volumes:
+  kafka_kraft:
